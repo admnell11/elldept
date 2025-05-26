@@ -401,6 +401,9 @@
                     <div id="navDragDropRoutine" class="submenu-item">Routine Maker</div>
                 </div>
             </div>
+            <div class="nav-menu-item">
+                <button class="nav-menu-button" id="logoutButton">Logout</button>
+            </div>
         </nav>
 
         <div id="messageBoxOverlay" class="message-box-overlay"></div>
@@ -445,7 +448,7 @@
                 </div>
 
                 <div id="coursesOfferingsTab" class="tab-content active">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4" id="courseFormTitle">Add New Course</h3>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4" id="courseFormTitle">Add New Course to Curriculum</h3>
                     <form id="addCourseForm" class="space-y-4 mb-8">
                         <div>
                             <label for="courseName" class="block text-gray-700 text-sm font-bold mb-2">Course Name:</label>
@@ -456,11 +459,11 @@
                             <input type="text" id="courseCode" name="courseCode" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
-                            <label for="courseSemester" class="block text-gray-700 text-sm font-bold mb-2">Semester:</label>
+                            <label for="courseSemester" class="block text-gray-700 text-sm font-bold mb-2">Default Semester (e.g., 1st Semester):</label>
                             <input type="text" id="courseSemester" name="courseSemester" placeholder="e.g., Spring 2025" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
-                            <label for="courseFaculty" class="block text-gray-700 text-sm font-bold mb-2">Faculty (Teacher):</label>
+                            <label for="courseFaculty" class="block text-gray-700 text-sm font-bold mb-2">Default Faculty (Teacher):</label>
                             <select id="courseFaculty" name="courseFaculty" class="focus:ring-red-500 focus:border-red-500" required>
                                 <option value="">-- Select Faculty --</option>
                             </select>
@@ -485,7 +488,7 @@
                             </select>
                         </div>
                         <div>
-                            <label for="offeredToSemester" class="block text-gray-700 text-sm font-bold mb-2">Offered to (Semester):</label>
+                            <label for="offeredToSemester" class="block text-gray-700 text-sm font-bold mb-2">Offered to (Target Semester for Curriculum):</label>
                             <select id="offeredToSemester" name="offeredToSemester" class="focus:ring-red-500 focus:border-red-500" required>
                                 <option value="">-- Select Semester --</option>
                                 <option value="1st Semester">1st Semester</option>
@@ -506,11 +509,11 @@
                             <label for="courseRoom" class="block text-gray-700 text-sm font-bold mb-2">Default Room Number:</label>
                             <input type="text" id="courseRoom" name="courseRoom" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
-                        <button type="submit" id="addUpdateCourseBtn" class="btn-primary w-full">Add Course</button>
+                        <button type="submit" id="addUpdateCourseBtn" class="btn-primary w-full">Add Course to Curriculum</button>
                         <button type="button" id="cancelCourseEditBtn" class="btn-secondary w-full hidden">Cancel Edit</button>
                     </form>
 
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Courses</h3>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Courses (in Curriculum)</h3>
                     <div id="coursesList" class="overflow-x-auto mb-8">
                         <p class="text-gray-500 text-center">No courses added yet.</p>
                     </div>
@@ -521,13 +524,13 @@
                     <h3 class="text-2xl font-semibold text-gray-800 mb-4" id="courseOfferingFormTitle">Add Course Offering for Semester</h3>
                     <form id="addCourseOfferingForm" class="space-y-4 mb-8">
                         <div>
-                            <label for="offeringSemester" class="block text-gray-700 text-sm font-bold mb-2">Semester:</label>
+                            <label for="offeringSemester" class="block text-gray-700 text-sm font-bold mb-2">Semester for Offering (e.g., Spring 2025):</label>
                             <input type="text" id="offeringSemester" name="offeringSemester" placeholder="e.g., Spring 2025" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Select Courses for this Offering:</label>
+                            <label class="block text-gray-700 text-sm font-bold mb-2">Select Courses from Curriculum for this Offering:</label>
                             <div id="availableCoursesForOffering" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-60 overflow-y-auto border p-4 rounded-md">
-                                <p class="text-gray-500">No courses available. Add courses first.</p>
+                                <p class="text-gray-500">No courses available. Add courses to curriculum first.</p>
                             </div>
                         </div>
                         <button type="submit" id="addUpdateOfferingBtn" class="btn-primary w-full">Add Course Offering</button>
@@ -1129,8 +1132,8 @@
             saveData('courses', courses);
             addCourseForm.reset();
             editingCourseId = null;
-            document.getElementById('addUpdateCourseBtn').textContent = 'Add Course';
-            document.getElementById('courseFormTitle').textContent = 'Add New Course';
+            document.getElementById('addUpdateCourseBtn').textContent = 'Add Course to Curriculum';
+            document.getElementById('courseFormTitle').textContent = 'Add New Course to Curriculum';
             document.getElementById('cancelCourseEditBtn').classList.add('hidden');
             displayCourses();
             populateAvailableCoursesForOffering(); // Refresh for offerings
@@ -1157,7 +1160,7 @@
 
                 editingCourseId = id;
                 document.getElementById('addUpdateCourseBtn').textContent = 'Update Course';
-                document.getElementById('courseFormTitle').textContent = 'Edit Course';
+                document.getElementById('courseFormTitle').textContent = 'Edit Course in Curriculum';
                 document.getElementById('cancelCourseEditBtn').classList.remove('hidden');
             }
         }
@@ -1168,8 +1171,8 @@
         document.getElementById('cancelCourseEditBtn').addEventListener('click', () => {
             addCourseForm.reset();
             editingCourseId = null;
-            document.getElementById('addUpdateCourseBtn').textContent = 'Add Course';
-            document.getElementById('courseFormTitle').textContent = 'Add New Course';
+            document.getElementById('addUpdateCourseBtn').textContent = 'Add Course to Curriculum';
+            document.getElementById('courseFormTitle').textContent = 'Add New Course to Curriculum';
             document.getElementById('cancelCourseEditBtn').classList.add('hidden');
         });
 
@@ -1201,7 +1204,7 @@
             const container = document.getElementById('availableCoursesForOffering');
             container.innerHTML = '';
             if (courses.length === 0) {
-                container.innerHTML = '<p class="text-gray-500">No courses available. Add courses first.</p>';
+                container.innerHTML = '<p class="text-gray-500">No courses available. Add courses to curriculum first.</p>';
                 return;
             }
 
@@ -1210,7 +1213,7 @@
                 checkboxDiv.classList.add('flex', 'items-center');
                 checkboxDiv.innerHTML = `
                     <input type="checkbox" id="offeringCourse_${course.id}" name="selectedCourses" value="${course.id}" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
-                    <label for="offeringCourse_${course.id}" class="ml-2 text-gray-700 text-sm">${course.code} - ${course.name}</label>
+                    <label for="offeringCourse_${course.id}" class="ml-2 text-gray-700 text-sm">${course.code} - ${course.name} (${course.curriculum}, ${course.offeredToSemester})</label>
                 `;
                 container.appendChild(checkboxDiv);
             });
@@ -1230,8 +1233,8 @@
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
-                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Semester</th>
-                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Offered Courses</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Offering Semester</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Offered Courses (Curriculum, Target Semester)</th>
                             <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -1239,15 +1242,15 @@
             `;
 
             courseOfferings.forEach(offering => {
-                const offeredCourseNames = offering.courseIds.map(courseId => {
+                const offeredCourseDetails = offering.courseIds.map(courseId => {
                     const course = courses.find(c => c.id === courseId);
-                    return course ? `${course.code} - ${course.name}` : 'Unknown Course';
-                }).join(', ');
+                    return course ? `${course.code} - ${course.name} (${course.curriculum}, ${course.offeredToSemester})` : 'Unknown Course';
+                }).join('<br>'); // Use <br> for better readability in a table cell
 
                 tableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${offering.semester}</td>
-                        <td class="py-3 px-4 border-b border-gray-200">${offeredCourseNames}</td>
+                        <td class="py-3 px-4 border-b border-gray-200">${offeredCourseDetails}</td>
                         <td class="py-3 px-4 border-b border-gray-200">
                             <button onclick="editCourseOffering('${offering.id}')" class="text-blue-600 hover:text-blue-900 text-sm mr-2">Edit</button>
                             <button onclick="deleteCourseOffering('${offering.id}')" class="text-red-600 hover:text-red-900 text-sm">Delete</button>
@@ -2272,13 +2275,14 @@
             showMessageBox('Routine saved successfully!');
         });
 
-        // --- Login Logic ---
+        // --- Login/Logout Logic ---
         const loginForm = document.getElementById('loginForm');
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
         const loginError = document.getElementById('loginError');
         const loginSection = document.getElementById('loginSection');
         const mainContent = document.getElementById('mainContent');
+        const logoutButton = document.getElementById('logoutButton');
 
         loginForm.addEventListener('submit', (event) => {
             event.preventDefault();
@@ -2299,6 +2303,19 @@
                 loginError.classList.remove('hidden');
             }
         });
+
+        /**
+         * Handles the logout process.
+         */
+        logoutButton.addEventListener('click', () => {
+            mainContent.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            usernameInput.value = ''; // Clear username field
+            passwordInput.value = ''; // Clear password field
+            loginError.classList.add('hidden'); // Hide any previous login errors
+            showMessageBox('Logged out successfully.');
+        });
+
 
         // --- Initial App Load ---
         /**
