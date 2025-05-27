@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Central Women's University - Class Attendance Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* Custom styles for better aesthetics */
         body {
@@ -147,37 +149,79 @@
             z-index: 999;
             display: none; /* Hidden by default */
         }
-        .print-section {
-            display: none; /* Hidden by default for screen */
-        }
+        /* Print specific styles */
         @media print {
-            body > *:not(.print-section) {
-                display: none !important; /* Hide everything except the print section */
+            body {
+                font-family: 'Times New Roman', serif !important; /* Changed font */
+                background-color: #fff;
+                color: #000;
+                margin: 0;
+                padding: 0;
+                font-size: 10pt; /* Smaller font for print */
             }
-            .print-section {
-                display: block !important;
-                position: absolute;
-                top: 0;
-                left: 0;
+            .container, #mainContent {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+            .content-section {
+                padding: 15mm !important; /* Add padding for print margins */
+                margin-bottom: 10mm; /* Space between sections */
+                page-break-after: always; /* Force page break after each major section */
+            }
+            .content-section:last-child {
+                page-break-after: auto; /* No page break after the last section */
+            }
+            /* Removed print-header and print-footer */
+            .print-header, .print-footer {
+                display: none !important;
+            }
+            /* Hide non-essential elements */
+            #loginSection, .nav-menu-item, .tab-buttons, form, .btn-primary, .btn-secondary, .message-box, .message-box-overlay, #loadingIndicator, .clash-report, .delete-btn {
+                display: none !important;
+            }
+            /* Ensure tables are fully visible and styled */
+            table {
+                border: 1px solid #000;
                 width: 100%;
-                height: auto;
-                background: white;
-                padding: 20px;
-                box-shadow: none;
+                font-size: 9pt;
             }
-            .print-section h1, .print-section h2, .print-section h3 {
+            th, td {
+                border: 1px solid #000;
+                padding: 5px;
+                background-color: #fff !important; /* Override background colors */
                 color: #000 !important;
             }
-            .print-section table {
+            th {
+                font-weight: bold;
+            }
+            tr:nth-child(even) {
+                background-color: #f9f9f9 !important; /* Light stripe for readability */
+            }
+            /* Specific adjustments for drag & drop routine grid */
+            #dragDropRoutineGrid {
+                min-width: unset; /* Allow shrinking for print */
                 width: 100%;
-                border-collapse: collapse;
             }
-            .print-section th, .print-section td {
-                border: 1px solid #ccc;
-                padding: 8px;
+            .routine-grid-container {
+                overflow-x: visible; /* Ensure content is not hidden */
+                border: none; /* Remove border in print */
             }
-            .print-section th {
-                background-color: #f2f2f2;
+            .routine-grid th, .routine-grid td {
+                height: auto; /* Remove fixed height */
+                vertical-align: middle;
+            }
+            .routine-item {
+                background-color: #e0e0e0 !important; /* Neutral background for print */
+                color: #000 !important;
+                border: 1px solid #ccc !important;
+                box-shadow: none !important;
+                margin-bottom: 2px;
+                padding: 2px 5px;
+                font-size: 8pt;
             }
         }
 
@@ -344,6 +388,40 @@
         .tab-content.active {
             display: block;
         }
+
+        /* Expandable List Item Styles */
+        .expandable-item {
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            background-color: #fef2f2;
+            font-weight: 600;
+            color: #dc2626;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        .expandable-item:hover {
+            background-color: #fee2e2;
+        }
+        .expandable-content {
+            display: none;
+            padding: 1rem;
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            border-top: none;
+            margin-bottom: 0.5rem;
+        }
+        .expandable-content.active {
+            display: block;
+        }
+        .expandable-item .arrow {
+            transition: transform 0.2s ease;
+        }
+        .expandable-item.active .arrow {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -359,6 +437,10 @@
                 <div>
                     <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
                     <input type="password" id="password" name="password" required class="focus:ring-red-500 focus:border-red-500">
+                </div>
+                <div class="flex items-center mb-4">
+                    <input type="checkbox" id="keepLoggedIn" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                    <label for="keepLoggedIn" class="ml-2 text-gray-700 text-sm">Keep me logged in</label>
                 </div>
                 <button type="submit" class="btn-primary w-full">Login</button>
                 <p id="loginError" class="text-red-500 text-center text-sm mt-2 hidden">Invalid username or password.</p>
@@ -377,9 +459,9 @@
             <div class="nav-menu-item">
                 <button class="nav-menu-button" data-target="academicManagementSubmenu">Academic Management</button>
                 <div id="academicManagementSubmenu" class="submenu">
-                    <div id="navCourses" class="submenu-item">Courses</div>
+                    <div id="navCurricula" class="submenu-item">Curricula</div>
                     <div id="navStudents" class="submenu-item">Students</div>
-                    <div id="navTeachers" class="submenu-item">Teachers</div>
+                    <div id="navFaculty" class="submenu-item">Faculty</div>
                     <div id="navCourseOfferings" class="submenu-item">Course Offerings</div>
                 </div>
             </div>
@@ -423,13 +505,13 @@
             <h2 class="text-3xl font-bold text-red-700 mb-6">Home</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="card p-6">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Today's Events</h3>
-                    <div id="todayEventsList" class="space-y-2">
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Events and Agendas</h3>
+                    <div id="eventsAgendasList" class="space-y-2">
                         <p class="text-gray-500">No events scheduled for today.</p>
                     </div>
                 </div>
                 <div class="card p-6">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Upcoming Events (Next 7 Days)</h3>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Upcoming Events</h3>
                     <div id="upcomingEventsList" class="space-y-2">
                         <p class="text-gray-500">No upcoming events.</p>
                     </div>
@@ -443,7 +525,7 @@
             <div class="card p-6">
                 <div class="tab-buttons">
                     <button class="tab-button active" data-tab="coursesOfferings">Courses & Offerings</button>
-                    <button class="tab-button" data-tab="people">People (Students & Teachers)</button>
+                    <button class="tab-button" data-tab="people">People (Students & Faculty)</button>
                     <button class="tab-button" data-tab="calendarEvents">Calendar Events (Routine, Holidays, Agendas)</button>
                 </div>
 
@@ -457,6 +539,10 @@
                         <div>
                             <label for="courseCode" class="block text-gray-700 text-sm font-bold mb-2">Course Code:</label>
                             <input type="text" id="courseCode" name="courseCode" required class="focus:ring-red-500 focus:border-red-500">
+                        </div>
+                        <div>
+                            <label for="courseCredit" class="block text-gray-700 text-sm font-bold mb-2">Credit:</label>
+                            <input type="number" id="courseCredit" name="courseCredit" step="0.5" min="0" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
                             <label for="courseSemester" class="block text-gray-700 text-sm font-bold mb-2">Default Semester (e.g., 1st Semester):</label>
@@ -474,6 +560,9 @@
                                 <option value="">-- Select Type --</option>
                                 <option value="Core Course">Core Course</option>
                                 <option value="GED">GED</option>
+                                <option value="Elective">Elective</option>
+                                <option value="Thesis">Thesis</option>
+                                <option value="Optional General Education">Optional General Education</option>
                             </select>
                         </div>
                         <div>
@@ -499,6 +588,9 @@
                                 <option value="6th Semester">6th Semester</option>
                                 <option value="7th Semester">7th Semester</option>
                                 <option value="8th Semester">8th Semester</option>
+                                <option value="Foundation Semester">Foundation Semester</option>
+                                <option value="Flexible">Flexible</option>
+                                <option value="Final Semester">Final Semester</option>
                             </select>
                         </div>
                         <div>
@@ -517,7 +609,11 @@
                     <div id="coursesList" class="overflow-x-auto mb-8">
                         <p class="text-gray-500 text-center">No courses added yet.</p>
                     </div>
-                    <button onclick="printSection('coursesList')" class="btn-secondary mt-6">Print Courses</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('coursesList', 'Courses List')" class="btn-secondary">Print Courses</button>
+                        <button onclick="downloadPdf('coursesList', 'Courses List')" class="btn-primary">Download PDF</button>
+                    </div>
+                    
 
                     <hr class="my-8">
 
@@ -541,7 +637,10 @@
                     <div id="courseOfferingsList" class="overflow-x-auto">
                         <p class="text-gray-500 text-center">No course offerings added yet.</p>
                     </div>
-                    <button onclick="printSection('courseOfferingsList')" class="btn-secondary mt-6">Print Course Offerings</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('courseOfferingsList', 'Course Offerings List')" class="btn-secondary">Print Course Offerings</button>
+                        <button onclick="downloadPdf('courseOfferingsList', 'Course Offerings List')" class="btn-primary">Download PDF</button>
+                    </div>
                 </div>
 
                 <div id="peopleTab" class="tab-content">
@@ -567,14 +666,18 @@
                     <div id="studentsList" class="overflow-x-auto mb-8">
                         <p class="text-gray-500 text-center">No students added yet.</p>
                     </div>
-                    <button onclick="printSection('studentsList')" class="btn-secondary mt-6">Print Students</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('studentsList', 'Students List')" class="btn-secondary">Print Students</button>
+                        <button onclick="downloadPdf('studentsList', 'Students List')" class="btn-primary">Download PDF</button>
+                    </div>
+                    
 
                     <hr class="my-8">
 
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4" id="teacherFormTitle">Add New Teacher</h3>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4" id="teacherFormTitle">Add New Faculty</h3>
                     <form id="addTeacherForm" class="space-y-4 mb-8">
                         <div>
-                            <label for="teacherName" class="block text-gray-700 text-sm font-bold mb-2">Teacher Name:</label>
+                            <label for="teacherName" class="block text-gray-700 text-sm font-bold mb-2">Faculty Name:</label>
                             <input type="text" id="teacherName" name="teacherName" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
@@ -582,22 +685,25 @@
                             <input type="text" id="teacherInitials" name="teacherInitials" required class="focus:ring-red-500 focus:border-red-500">
                         </div>
                         <div>
-                            <label for="teacherType" class="block text-gray-700 text-sm font-bold mb-2">Teacher Type:</label>
+                            <label for="teacherType" class="block text-gray-700 text-sm font-bold mb-2">Faculty Type:</label>
                             <select id="teacherType" name="teacherType" class="focus:ring-red-500 focus:border-red-500" required>
                                 <option value="">-- Select Type --</option>
                                 <option value="Regular">Regular</option>
                                 <option value="Adjunct">Adjunct</option>
                             </select>
                         </div>
-                        <button type="submit" id="addUpdateTeacherBtn" class="btn-primary w-full">Add Teacher</button>
+                        <button type="submit" id="addUpdateTeacherBtn" class="btn-primary w-full">Add Faculty</button>
                         <button type="button" id="cancelTeacherEditBtn" class="btn-secondary w-full hidden">Cancel Edit</button>
                     </form>
 
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Teachers</h3>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Existing Faculty</h3>
                     <div id="teachersList" class="overflow-x-auto">
-                        <p class="text-gray-500 text-center">No teachers added yet.</p>
+                        <p class="text-gray-500 text-center">No faculty added yet.</p>
                     </div>
-                    <button onclick="printSection('teachersList')" class="btn-secondary mt-6">Print Teachers</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('teachersList', 'Faculty List')" class="btn-secondary">Print Faculty</button>
+                        <button onclick="downloadPdf('teachersList', 'Faculty List')" class="btn-primary">Download PDF</button>
+                    </div>
                 </div>
 
                 <div id="calendarEventsTab" class="tab-content">
@@ -644,7 +750,11 @@
                     <div id="routineList" class="overflow-x-auto mb-8">
                         <p class="text-gray-500 text-center">No routine entries added yet.</p>
                     </div>
-                    <button onclick="printSection('routineList')" class="btn-secondary mt-6">Print Routine</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('routineList', 'Routine List')" class="btn-secondary">Print Routine</button>
+                        <button onclick="downloadPdf('routineList', 'Routine List')" class="btn-primary">Download PDF</button>
+                    </div>
+                    
 
                     <hr class="my-8">
 
@@ -684,17 +794,23 @@
                     <div id="holidaysList" class="overflow-x-auto">
                         <p class="text-gray-500 text-center">No events added yet.</p>
                     </div>
-                    <button onclick="printSection('holidaysList')" class="btn-secondary mt-6">Print Events</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button onclick="printSection('holidaysList', 'Academic Calendar Events')" class="btn-secondary">Print Events</button>
+                        <button onclick="downloadPdf('holidaysList', 'Academic Calendar Events')" class="btn-primary">Download PDF</button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section id="coursesSection" class="content-section hidden">
-            <h2 class="text-3xl font-bold text-red-700 mb-6">Courses</h2>
-            <div id="displayCoursesList" class="overflow-x-auto card p-6">
-                <p class="text-gray-500 text-center">No courses to display.</p>
+        <section id="curriculaSection" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-red-700 mb-6">Curricula</h2>
+            <div id="displayCurriculaList" class="overflow-x-auto card p-6">
+                <p class="text-gray-500 text-center">No curricula to display.</p>
             </div>
-            <button onclick="printSection('displayCoursesList')" class="btn-secondary mt-6">Print Displayed Courses</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayCurriculaList', 'Curricula Display')" class="btn-secondary">Print Displayed Curricula</button>
+                <button onclick="downloadPdf('displayCurriculaList', 'Curricula Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
         <section id="studentsSection" class="content-section hidden">
@@ -702,15 +818,21 @@
             <div id="displayStudentsList" class="overflow-x-auto card p-6">
                 <p class="text-gray-500 text-center">No students to display.</p>
             </div>
-            <button onclick="printSection('displayStudentsList')" class="btn-secondary mt-6">Print Displayed Students</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayStudentsList', 'Students Display')" class="btn-secondary">Print Displayed Students</button>
+                <button onclick="downloadPdf('displayStudentsList', 'Students Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
-        <section id="teachersSection" class="content-section hidden">
-            <h2 class="text-3xl font-bold text-red-700 mb-6">Teachers</h2>
-            <div id="displayTeachersList" class="overflow-x-auto card p-6">
-                <p class="text-gray-500 text-center">No teachers to display.</p>
+        <section id="facultySection" class="content-section hidden">
+            <h2 class="text-3xl font-bold text-red-700 mb-6">Faculty</h2>
+            <div id="displayFacultyList" class="overflow-x-auto card p-6">
+                <p class="text-gray-500 text-center">No faculty to display.</p>
             </div>
-            <button onclick="printSection('displayTeachersList')" class="btn-secondary mt-6">Print Displayed Teachers</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayFacultyList', 'Faculty Display')" class="btn-secondary">Print Displayed Faculty</button>
+                <button onclick="downloadPdf('displayFacultyList', 'Faculty Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
         <section id="courseOfferingsSection" class="content-section hidden">
@@ -718,7 +840,10 @@
             <div id="displayCourseOfferingsList" class="overflow-x-auto card p-6">
                 <p class="text-gray-500 text-center">No course offerings to display.</p>
             </div>
-            <button onclick="printSection('displayCourseOfferingsList')" class="btn-secondary mt-6">Print Displayed Course Offerings</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayCourseOfferingsList', 'Course Offerings Display')" class="btn-secondary">Print Displayed Course Offerings</button>
+                <button onclick="downloadPdf('displayCourseOfferingsList', 'Course Offerings Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
         <section id="routineSection" class="content-section hidden">
@@ -726,7 +851,10 @@
             <div id="displayRoutineList" class="overflow-x-auto card p-6">
                 <p class="text-gray-500 text-center">No routine entries to display.</p>
             </div>
-            <button onclick="printSection('displayRoutineList')" class="btn-secondary mt-6">Print Displayed Routine</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayRoutineList', 'Class Routine Display')" class="btn-secondary">Print Displayed Routine</button>
+                <button onclick="downloadPdf('displayRoutineList', 'Class Routine Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
         <section id="attendanceSection" class="content-section hidden">
@@ -752,8 +880,11 @@
                 <div id="attendanceTableContainer" class="overflow-x-auto mb-4">
                     <p class="text-gray-500 text-center">Select a course and date to load attendance.</p>
                 </div>
-                <button id="saveAttendanceBtn" class="btn-primary w-full mb-4">Save Attendance</button>
-                <button onclick="printSection('attendanceSheetDisplay')" class="btn-secondary w-full">Print Attendance Sheet</button>
+                <div class="flex flex-wrap gap-2 mt-6">
+                    <button id="saveAttendanceBtn" class="btn-primary">Save Attendance</button>
+                    <button onclick="printSection('attendanceSheetDisplay', 'Attendance Sheet')" class="btn-secondary">Print Attendance Sheet</button>
+                    <button onclick="downloadPdf('attendanceSheetDisplay', 'Attendance Sheet')" class="btn-primary">Download PDF</button>
+                </div>
             </div>
         </section>
 
@@ -762,13 +893,20 @@
             <div id="displayHolidaysList" class="overflow-x-auto card p-6">
                 <p class="text-gray-500 text-center">No holidays or events to display.</p>
             </div>
-            <button onclick="printSection('displayHolidaysList')" class="btn-secondary mt-6">Print Displayed Events</button>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('displayHolidaysList', 'Holidays and Events Display')" class="btn-secondary">Print Displayed Events</button>
+                <button onclick="downloadPdf('displayHolidaysList', 'Holidays and Events Display')" class="btn-primary">Download PDF</button>
+            </div>
         </section>
 
         <section id="academicCalendarSection" class="content-section hidden">
             <h2 class="text-3xl font-bold text-red-700 mb-6">Academic Calendar</h2>
             <div id="academicCalendarDisplay" class="card p-6">
                 <p class="text-gray-500 text-center">Academic calendar content will be displayed here.</p>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button onclick="printSection('academicCalendarDisplay', 'Academic Calendar')" class="btn-secondary">Print Academic Calendar</button>
+                <button onclick="downloadPdf('academicCalendarDisplay', 'Academic Calendar')" class="btn-primary">Download PDF</button>
             </div>
         </section>
 
@@ -801,7 +939,12 @@
                                 </tbody>
                         </table>
                     </div>
-                    <button id="saveRoutineGridBtn" class="btn-primary mt-6 w-full">Save Routine</button>
+                    <div class="flex flex-wrap gap-2 mt-6">
+                        <button id="saveRoutineGridBtn" class="btn-primary">Save Routine</button>
+                        <button onclick="printSection('dragDropRoutineGrid', 'Drag & Drop Routine Grid')" class="btn-secondary">Print Routine Grid</button>
+                        <button onclick="downloadPdf('dragDropRoutineGrid', 'Drag & Drop Routine Grid')" class="btn-primary">Download PDF</button>
+                    </div>
+                    
                     <div id="clashReport" class="clash-report hidden">
                         <h3>Clash Report</h3>
                         <ul id="clashReportList"></ul>
@@ -820,6 +963,7 @@
         let routineEntries = JSON.parse(localStorage.getItem('routineEntries')) || [];
         let holidaysEvents = JSON.parse(localStorage.getItem('holidaysEvents')) || [];
         let attendanceRecords = JSON.parse(localStorage.getItem('attendanceRecords')) || {}; // {courseId_date: {studentId: present/absent}}
+        let isLoggedIn = localStorage.getItem('isLoggedIn') === 'true'; // Track login state
 
         // --- Helper Functions ---
 
@@ -856,28 +1000,174 @@
         }
 
         /**
-         * Prints the content of a specific section.
-         * @param {string} sectionId - The ID of the section to print.
+         * Prints the content of a specific section with professional headers/footers.
+         * @param {string} sectionId - The ID of the section containing the content to print.
+         * @param {string} reportTitle - The title for the print report.
          */
-        function printSection(sectionId) {
+        function printSection(sectionId, reportTitle) {
             const sectionToPrint = document.getElementById(sectionId);
-            if (sectionToPrint) {
-                // Create a temporary div to hold the content for printing
-                const printContainer = document.createElement('div');
-                printContainer.classList.add('print-section');
-                printContainer.innerHTML = `
-                    <h1 class="text-3xl font-bold text-center mb-4">Central Women's University</h1>
-                    <h2 class="text-xl font-semibold text-center mb-6">Department of English Language and Literature</h2>
-                    <h3 class="text-2xl font-bold mb-4">${sectionToPrint.previousElementSibling ? sectionToPrint.previousElementSibling.textContent : 'Report'}</h3>
-                    ${sectionToPrint.innerHTML}
-                `;
-                document.body.appendChild(printContainer);
-                window.print();
-                document.body.removeChild(printContainer); // Remove the temporary div after printing
-            } else {
+            if (!sectionToPrint) {
                 showMessageBox('Error: Section not found for printing.');
+                return;
+            }
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>${reportTitle} - Central Women's University</title>
+                    <style>
+                        body {
+                            font-family: 'Times New Roman', serif !important;
+                            margin: 0;
+                            padding: 0;
+                            color: #000;
+                            font-size: 10pt;
+                        }
+                        .print-page {
+                            width: 210mm; /* A4 width */
+                            min-height: 297mm; /* A4 height */
+                            margin: 0 auto;
+                            padding: 15mm;
+                            box-sizing: border-box;
+                            page-break-after: always;
+                        }
+                        .print-page:last-child {
+                            page-break-after: auto;
+                        }
+                        /* Removed print-header and print-footer */
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 1rem;
+                        }
+                        th, td {
+                            border: 1px solid #000;
+                            padding: 8px;
+                            text-align: left;
+                            background-color: #fff !important;
+                            color: #000 !important;
+                        }
+                        th {
+                            font-weight: bold;
+                            background-color: #f2f2f2 !important;
+                        }
+                        tr:nth-child(even) {
+                            background-color: #f9f9f9 !important;
+                        }
+                        .routine-grid-container {
+                            overflow-x: visible;
+                            border: none;
+                        }
+                        .routine-grid {
+                            min-width: unset;
+                            width: 100%;
+                        }
+                        .routine-grid th, .routine-grid td {
+                            height: auto;
+                            vertical-align: middle;
+                        }
+                        .routine-item {
+                            background-color: #e0e0e0 !important;
+                            color: #000 !important;
+                            border: 1px solid #ccc !important;
+                            box-shadow: none !important;
+                            margin-bottom: 2px;
+                            padding: 2px 5px;
+                            font-size: 8pt;
+                        }
+                        button, a.btn, input[type="checkbox"], select, form, .flex-wrap, .gap-2, .mt-6 {
+                            display: none !important;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-page">
+                        <div class="print-content">
+                            ${sectionToPrint.innerHTML}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            printWindow.close();
+        }
+
+
+        /**
+         * Downloads the content of a specific section as a PDF.
+         * @param {string} sectionId - The ID of the section to download.
+         * @param {string} fileNamePrefix - Prefix for the downloaded PDF file name.
+         */
+        async function downloadPdf(sectionId, fileNamePrefix) {
+            showLoading();
+            const element = document.getElementById(sectionId);
+            if (!element) {
+                showMessageBox('Error: Section not found for PDF download.');
+                hideLoading();
+                return;
+            }
+
+            // Create a temporary container to ensure correct rendering for PDF
+            const tempDiv = document.createElement('div');
+            tempDiv.style.padding = '20px';
+            tempDiv.style.backgroundColor = 'white';
+            tempDiv.style.fontFamily = 'Times New Roman, serif'; // Changed font
+            tempDiv.style.color = '#334155';
+            tempDiv.style.width = 'fit-content'; // Adjust width to content
+            tempDiv.style.maxWidth = '100%'; // Ensure it doesn't overflow
+            tempDiv.innerHTML = `
+                <h1 style="font-size: 2rem; font-weight: bold; text-align: center; color: #b91c1c; margin-bottom: 0.5rem;">Central Women's University</h1>
+                <h2 style="font-size: 1.5rem; font-weight: bold; text-align: center; color: #dc2626; margin-bottom: 1.5rem;">Department of English Language and Literature</h2>
+                <h3 style="font-size: 1.25rem; font-weight: bold; color: #334155; margin-bottom: 1rem;">${fileNamePrefix}</h3>
+                ${element.innerHTML}
+            `;
+            document.body.appendChild(tempDiv);
+
+            try {
+                const canvas = await html2canvas(tempDiv, {
+                    scale: 2, // Increase scale for better resolution
+                    useCORS: true, // Enable CORS if images are from external sources
+                    logging: false // Disable logging for cleaner console
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jspdf.jsPDF('p', 'mm', 'a4'); // 'p' for portrait, 'mm' for millimeters, 'a4' for A4 size
+
+                const imgWidth = 210; // A4 width in mm
+                const pageHeight = 297; // A4 height in mm
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                pdf.save(`${fileNamePrefix.replace(/\s/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+                showMessageBox('PDF downloaded successfully!');
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                showMessageBox('Failed to generate PDF. Please try again.');
+            } finally {
+                document.body.removeChild(tempDiv); // Clean up the temporary div
+                hideLoading();
             }
         }
+
 
         /**
          * Saves data to localStorage.
@@ -893,6 +1183,7 @@
         const navButtons = document.querySelectorAll('.nav-menu-button');
         const submenuItems = document.querySelectorAll('.submenu-item');
         const submenus = document.querySelectorAll('.submenu');
+        const navHomeButton = document.getElementById('navHomeButton');
 
         /**
          * Hides all content sections.
@@ -966,9 +1257,9 @@
         submenuItems.forEach(item => {
             item.addEventListener('click', (event) => {
                 const sectionIdMap = {
-                    'navCourses': 'coursesSection',
+                    'navCurricula': 'curriculaSection',
                     'navStudents': 'studentsSection',
-                    'navTeachers': 'teachersSection',
+                    'navFaculty': 'facultySection',
                     'navCourseOfferings': 'courseOfferingsSection',
                     'navRoutine': 'routineSection',
                     'navAttendance': 'attendanceSection',
@@ -981,9 +1272,9 @@
                 if (targetSectionId) {
                     showSection(targetSectionId, item);
                     // Specific refresh functions for sections
-                    if (item.id === 'navCourses') displayCourses();
+                    if (item.id === 'navCurricula') displayCurricula();
                     if (item.id === 'navStudents') displayStudents();
-                    if (item.id === 'navTeachers') displayTeachers();
+                    if (item.id === 'navFaculty') displayFaculty();
                     if (item.id === 'navCourseOfferings') displayCourseOfferings();
                     if (item.id === 'navRoutine') displayRoutine();
                     if (item.id === 'navAttendance') populateAttendanceCourseSelect();
@@ -992,10 +1283,10 @@
                         populateCourseFacultySelect();
                         populateRoutineCourseSelect();
                         populateAvailableCoursesForOffering();
-                        displayCourses();
+                        displayCourses(); // This is still used for the form, will rename later if needed
                         displayCourseOfferings();
                         displayStudents();
-                        displayTeachers();
+                        displayTeachers(); // This is still used for the form, will rename later if needed
                         displayRoutine();
                         displayHolidaysEvents();
                     }
@@ -1027,18 +1318,17 @@
             });
         });
 
-        // --- Course Management ---
+        // --- Course Management (for Add/Remove form) ---
         const addCourseForm = document.getElementById('addCourseForm');
-        const coursesListDiv = document.getElementById('coursesList');
+        const coursesListDiv = document.getElementById('coursesList'); // This is for the add/remove tab
         let editingCourseId = null;
 
         /**
-         * Renders the list of courses.
+         * Renders the list of courses for the Add/Remove tab.
          */
         function displayCourses() {
             if (courses.length === 0) {
                 coursesListDiv.innerHTML = '<p class="text-gray-500 text-center">No courses added yet.</p>';
-                document.getElementById('displayCoursesList').innerHTML = '<p class="text-gray-500 text-center">No courses to display.</p>';
                 return;
             }
 
@@ -1046,8 +1336,9 @@
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
-                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Code</th>
-                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Name</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Credit</th>
                             <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Semester</th>
                             <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Faculty</th>
                             <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
@@ -1067,6 +1358,7 @@
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${course.code}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${course.name}</td>
+                        <td class="py-3 px-4 border-b border-gray-200">${course.credit || 'N/A'}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${course.semester}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${faculty ? faculty.name : 'N/A'}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${course.type}</td>
@@ -1083,7 +1375,6 @@
             });
             tableHtml += `</tbody></table>`;
             coursesListDiv.innerHTML = tableHtml;
-            document.getElementById('displayCoursesList').innerHTML = tableHtml;
         }
 
         /**
@@ -1111,6 +1402,7 @@
                 id: editingCourseId || Date.now().toString(), // Unique ID
                 name: formData.get('courseName'),
                 code: formData.get('courseCode'),
+                credit: parseFloat(formData.get('courseCredit')), // Added credit
                 semester: formData.get('courseSemester'),
                 facultyId: formData.get('courseFaculty'),
                 type: formData.get('courseType'),
@@ -1139,6 +1431,7 @@
             populateAvailableCoursesForOffering(); // Refresh for offerings
             populateRoutineCourseSelect(); // Refresh for routine
             populateDragCoursesList(); // Refresh for drag and drop routine
+            displayCurricula(); // Refresh curricula view
         });
 
         /**
@@ -1150,6 +1443,7 @@
             if (courseToEdit) {
                 document.getElementById('courseName').value = courseToEdit.name;
                 document.getElementById('courseCode').value = courseToEdit.code;
+                document.getElementById('courseCredit').value = courseToEdit.credit; // Added credit
                 document.getElementById('courseSemester').value = courseToEdit.semester;
                 document.getElementById('courseFaculty').value = courseToEdit.facultyId;
                 document.getElementById('courseType').value = courseToEdit.type;
@@ -1188,13 +1482,91 @@
                 populateAvailableCoursesForOffering();
                 populateRoutineCourseSelect();
                 populateDragCoursesList();
+                displayCurricula(); // Refresh curricula view
                 showMessageBox('Course deleted successfully!');
             }
         }
 
+        // --- Curricula Management (New Section) ---
+        const displayCurriculaListDiv = document.getElementById('displayCurriculaList');
+
+        function displayCurricula() {
+            if (courses.length === 0) {
+                displayCurriculaListDiv.innerHTML = '<p class="text-gray-500 text-center">No curricula to display. Add courses to curriculum first.</p>';
+                return;
+            }
+
+            // Group courses by curriculum
+            const curriculaMap = courses.reduce((acc, course) => {
+                if (!acc[course.curriculum]) {
+                    acc[course.curriculum] = [];
+                }
+                acc[course.curriculum].push(course);
+                return acc;
+            }, {});
+
+            let htmlContent = '';
+            let slCounter = 1;
+
+            for (const curriculumName in curriculaMap) {
+                const curriculumCourses = curriculaMap[curriculumName].sort((a, b) => {
+                    const semesterOrder = {
+                        "Foundation Semester": 0, // New order for foundation
+                        "1st Semester": 1, "2nd Semester": 2, "3rd Semester": 3, "4th Semester": 4,
+                        "5th Semester": 5, "6th Semester": 6, "7th Semester": 7, "8th Semester": 8,
+                        "Flexible": 9, "Final Semester": 10 // New order for flexible and final
+                    };
+                    const semesterA = semesterOrder[a.offeredToSemester] || 99; // Default to high for unknown
+                    const semesterB = semesterOrder[b.offeredToSemester] || 99; // Default to high for unknown
+
+                    if (semesterA !== semesterB) return semesterA - semesterB;
+                    return a.code.localeCompare(b.code);
+                });
+
+                htmlContent += `
+                    <div class="expandable-item" onclick="toggleExpand(this)">
+                        <span>${curriculumName} <span class="text-sm text-gray-500">(${curriculumCourses.length} courses)</span></span>
+                        <span class="arrow">&#9658;</span>
+                    </div>
+                    <div class="expandable-content">
+                        <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sl</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Code</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Title</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Credit</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type of Course</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Offered in Semester</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                curriculumCourses.forEach((course, index) => {
+                    htmlContent += `
+                        <tr>
+                            <td class="py-3 px-4 border-b border-gray-200">${index + 1}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.code}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.name}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.credit || 'N/A'}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.type}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.offeredToSemester}</td>
+                        </tr>
+                    `;
+                });
+                htmlContent += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            displayCurriculaListDiv.innerHTML = htmlContent;
+        }
+
         // --- Course Offering Management ---
         const addCourseOfferingForm = document.getElementById('addCourseOfferingForm');
-        const courseOfferingsListDiv = document.getElementById('courseOfferingsList');
+        const courseOfferingsListDiv = document.getElementById('courseOfferingsList'); // For add/remove tab
+        const displayCourseOfferingsListDiv = document.getElementById('displayCourseOfferingsList'); // For display section
         let editingOfferingId = null;
 
         /**
@@ -1225,11 +1597,12 @@
         function displayCourseOfferings() {
             if (courseOfferings.length === 0) {
                 courseOfferingsListDiv.innerHTML = '<p class="text-gray-500 text-center">No course offerings added yet.</p>';
-                document.getElementById('displayCourseOfferingsList').innerHTML = '<p class="text-gray-500 text-center">No course offerings to display.</p>';
+                displayCourseOfferingsListDiv.innerHTML = '<p class="text-gray-500 text-center">No course offerings to display.</p>';
                 return;
             }
 
-            let tableHtml = `
+            // For Add/Remove tab
+            let addRemoveTableHtml = `
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
@@ -1240,14 +1613,12 @@
                     </thead>
                     <tbody>
             `;
-
             courseOfferings.forEach(offering => {
                 const offeredCourseDetails = offering.courseIds.map(courseId => {
                     const course = courses.find(c => c.id === courseId);
                     return course ? `${course.code} - ${course.name} (${course.curriculum}, ${course.offeredToSemester})` : 'Unknown Course';
-                }).join('<br>'); // Use <br> for better readability in a table cell
-
-                tableHtml += `
+                }).join('<br>');
+                addRemoveTableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${offering.semester}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${offeredCourseDetails}</td>
@@ -1258,9 +1629,59 @@
                     </tr>
                 `;
             });
-            tableHtml += `</tbody></table>`;
-            courseOfferingsListDiv.innerHTML = tableHtml;
-            document.getElementById('displayCourseOfferingsList').innerHTML = tableHtml;
+            addRemoveTableHtml += `</tbody></table>`;
+            courseOfferingsListDiv.innerHTML = addRemoveTableHtml;
+
+
+            // For Course Offerings section (expandable list)
+            let displayHtmlContent = '';
+            const uniqueSemesters = [...new Set(courseOfferings.map(o => o.semester))].sort();
+
+            uniqueSemesters.forEach(semester => {
+                const coursesForSemester = courseOfferings.filter(o => o.semester === semester)
+                                                        .flatMap(o => o.courseIds)
+                                                        .map(courseId => courses.find(c => c.id === courseId))
+                                                        .filter(c => c !== undefined); // Filter out undefined if course not found
+
+                displayHtmlContent += `
+                    <div class="expandable-item" onclick="toggleExpand(this)">
+                        <span>${semester} <span class="text-sm text-gray-500">(${coursesForSemester.length} courses offered)</span></span>
+                        <span class="arrow">&#9658;</span>
+                    </div>
+                    <div class="expandable-content">
+                        <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                            <thead>
+                                <tr>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Sl</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course Code</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Faculty</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type of Course</th>
+                                    <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Curriculum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                coursesForSemester.forEach((course, index) => {
+                    const faculty = teachers.find(t => t.id === course.facultyId);
+                    displayHtmlContent += `
+                        <tr>
+                            <td class="py-3 px-4 border-b border-gray-200">${index + 1}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.code}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.name}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${faculty ? faculty.name : 'N/A'}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.type}</td>
+                            <td class="py-3 px-4 border-b border-gray-200">${course.curriculum}</td>
+                        </tr>
+                    `;
+                });
+                displayHtmlContent += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            displayCourseOfferingsListDiv.innerHTML = displayHtmlContent;
         }
 
         /**
@@ -1353,7 +1774,8 @@
 
         // --- Student Management ---
         const addStudentForm = document.getElementById('addStudentForm');
-        const studentsListDiv = document.getElementById('studentsList');
+        const studentsListDiv = document.getElementById('studentsList'); // For add/remove tab
+        const displayStudentsListDiv = document.getElementById('displayStudentsList'); // For display section
         let editingStudentId = null;
 
         /**
@@ -1362,11 +1784,12 @@
         function displayStudents() {
             if (students.length === 0) {
                 studentsListDiv.innerHTML = '<p class="text-gray-500 text-center">No students added yet.</p>';
-                document.getElementById('displayStudentsList').innerHTML = '<p class="text-gray-500 text-center">No students to display.</p>';
+                displayStudentsListDiv.innerHTML = '<p class="text-gray-500 text-center">No students to display.</p>';
                 return;
             }
 
-            let tableHtml = `
+            // For Add/Remove tab
+            let addRemoveTableHtml = `
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
@@ -1380,7 +1803,7 @@
             `;
 
             students.forEach(student => {
-                tableHtml += `
+                addRemoveTableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${student.id}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${student.name}</td>
@@ -1392,9 +1815,51 @@
                     </tr>
                 `;
             });
-            tableHtml += `</tbody></table>`;
-            studentsListDiv.innerHTML = tableHtml;
-            document.getElementById('displayStudentsList').innerHTML = tableHtml;
+            addRemoveTableHtml += `</tbody></table>`;
+            studentsListDiv.innerHTML = addRemoveTableHtml;
+
+            // For Students section (expandable list)
+            let displayHtmlContent = '';
+            students.forEach(student => {
+                // Dummy data for student details
+                const studentCourses = courses.filter(c => c.offeredToSemester === student.currentSemester);
+                const issuesList = student.issues.map(issue => `<li>${issue}</li>`).join('');
+
+                displayHtmlContent += `
+                    <div class="expandable-item" onclick="toggleExpand(this)">
+                        <span>${student.id} - ${student.name}</span>
+                        <span class="arrow">&#9658;</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p class="mb-2"><strong>Current Semester:</strong> ${student.currentSemester}</p>
+                        <p class="mb-2"><strong>Curriculum:</strong> ${student.curriculum || 'N/A'}</p>
+                        <h4 class="font-semibold mb-2">Semester-wise Courses:</h4>
+                        ${studentCourses.length > 0 ? `
+                            <table class="min-w-full bg-white rounded-lg shadow overflow-hidden text-sm mb-2">
+                                <thead>
+                                    <tr>
+                                        <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
+                                        <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                                        <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Credit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${studentCourses.map(course => `
+                                        <tr>
+                                            <td class="py-2 px-3 border-b border-gray-200">${course.code}</td>
+                                            <td class="py-2 px-3 border-b border-gray-200">${course.name}</td>
+                                            <td class="py-2 px-3 border-b border-gray-200">${course.credit || 'N/A'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        ` : '<p class="text-gray-500 text-sm">No courses listed for this semester.</p>'}
+                        <h4 class="font-semibold mb-2">Issues:</h4>
+                        ${issuesList ? `<ul class="list-disc ml-5 text-sm">${issuesList}</ul>` : '<p class="text-gray-500 text-sm">No issues reported.</p>'}
+                    </div>
+                `;
+            });
+            displayStudentsListDiv.innerHTML = displayHtmlContent;
         }
 
         /**
@@ -1407,7 +1872,10 @@
             const newStudent = {
                 id: formData.get('studentId'), // Use student ID as unique ID
                 name: formData.get('studentName'),
-                address: formData.get('studentAddress')
+                address: formData.get('studentAddress'),
+                currentSemester: '1st Semester', // Placeholder
+                curriculum: 'BA (OBE)', // Placeholder
+                issues: [] // Placeholder
             };
 
             if (editingStudentId) {
@@ -1476,22 +1944,23 @@
             }
         }
 
-        // --- Teacher Management ---
-        const addTeacherForm = document.getElementById('addTeacherForm');
-        const teachersListDiv = document.getElementById('teachersList');
+        // --- Faculty Management (formerly Teacher) ---
+        const addTeacherForm = document.getElementById('addTeacherForm'); // Form ID remains 'addTeacherForm'
+        const teachersListDiv = document.getElementById('teachersList'); // For add/remove tab
+        const displayFacultyListDiv = document.getElementById('displayFacultyList'); // For display section
         let editingTeacherId = null;
 
         /**
-         * Renders the list of teachers.
+         * Renders the list of faculty.
          */
-        function displayTeachers() {
+        function displayTeachers() { // Function name remains 'displayTeachers' for form
             if (teachers.length === 0) {
-                teachersListDiv.innerHTML = '<p class="text-gray-500 text-center">No teachers added yet.</p>';
-                document.getElementById('displayTeachersList').innerHTML = '<p class="text-gray-500 text-center">No teachers to display.</p>';
+                teachersListDiv.innerHTML = '<p class="text-gray-500 text-center">No faculty added yet.</p>';
                 return;
             }
 
-            let tableHtml = `
+            // For Add/Remove tab
+            let addRemoveTableHtml = `
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
@@ -1505,7 +1974,7 @@
             `;
 
             teachers.forEach(teacher => {
-                tableHtml += `
+                addRemoveTableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${teacher.initials}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${teacher.name}</td>
@@ -1517,9 +1986,118 @@
                     </tr>
                 `;
             });
-            tableHtml += `</tbody></table>`;
-            teachersListDiv.innerHTML = tableHtml;
-            document.getElementById('displayTeachersList').innerHTML = tableHtml;
+            addRemoveTableHtml += `</tbody></table>`;
+            teachersListDiv.innerHTML = addRemoveTableHtml;
+        }
+
+        /**
+         * Renders the list of faculty for the Faculty section.
+         */
+        function displayFaculty() {
+            if (teachers.length === 0) {
+                displayFacultyListDiv.innerHTML = '<p class="text-gray-500 text-center">No faculty to display.</p>';
+                return;
+            }
+
+            let displayHtmlContent = '';
+            teachers.forEach(teacher => {
+                // Get courses taught by this faculty from routine entries
+                const facultyRoutineCourses = routineEntries.filter(entry => {
+                    const course = courses.find(c => c.id === entry.courseId);
+                    return course && course.facultyId === teacher.id;
+                }).map(entry => {
+                    const course = courses.find(c => c.id === entry.courseId);
+                    return {
+                        ...course,
+                        day: entry.day,
+                        startTime: entry.startTime,
+                        endTime: entry.endTime,
+                        room: entry.room,
+                        loadType: 'Regular Load' // Placeholder for load type
+                    };
+                });
+
+                const totalCredits = facultyRoutineCourses.reduce((sum, course) => sum + (course.credit || 0), 0);
+
+                // Group routine by semester
+                const routineBySemester = facultyRoutineCourses.reduce((acc, course) => {
+                    if (!acc[course.semester]) {
+                        acc[course.semester] = [];
+                    }
+                    acc[course.semester].push(course);
+                    return acc;
+                }, {});
+
+                let coursesTableHtml = '';
+                for (const semester in routineBySemester) {
+                    coursesTableHtml += `
+                        <h5 class="font-semibold mt-3 mb-1 text-gray-700">${semester} Courses:</h5>
+                        <table class="min-w-full bg-white rounded-lg shadow overflow-hidden text-sm mb-2">
+                            <thead>
+                                <tr>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Code</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Credit</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Load Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${routineBySemester[semester].map(course => `
+                                    <tr>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.code}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.name}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.credit || 'N/A'}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.loadType}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                }
+
+                let routineTableHtml = '';
+                if (facultyRoutineCourses.length > 0) {
+                    routineTableHtml = `
+                        <h4 class="font-semibold mt-3 mb-2">Class Routines:</h4>
+                        <table class="min-w-full bg-white rounded-lg shadow overflow-hidden text-sm">
+                            <thead>
+                                <tr>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Day</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
+                                    <th class="py-2 px-3 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${facultyRoutineCourses.map(course => `
+                                    <tr>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.code} - ${course.name}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.day}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.startTime}-${course.endTime}</td>
+                                        <td class="py-2 px-3 border-b border-gray-200">${course.room}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    routineTableHtml = '<p class="text-gray-500 text-sm">No class routines assigned.</p>';
+                }
+
+
+                displayHtmlContent += `
+                    <div class="expandable-item" onclick="toggleExpand(this)">
+                        <span>${teacher.name} (${teacher.initials}) - ${teacher.type}</span>
+                        <span class="arrow">&#9658;</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p class="mb-2"><strong>Total Credits Assigned:</strong> ${totalCredits}</p>
+                        ${coursesTableHtml}
+                        ${routineTableHtml}
+                    </div>
+                `;
+            });
+            displayFacultyListDiv.innerHTML = displayHtmlContent;
         }
 
         /**
@@ -1539,19 +2117,20 @@
             if (editingTeacherId) {
                 // Update existing teacher
                 teachers = teachers.map(teacher => teacher.id === editingTeacherId ? newTeacher : teacher);
-                showMessageBox('Teacher updated successfully!');
+                showMessageBox('Faculty updated successfully!');
             } else {
                 // Add new teacher
                 teachers.push(newTeacher);
-                showMessageBox('Teacher added successfully!');
+                showMessageBox('Faculty added successfully!');
             }
             saveData('teachers', teachers);
             addTeacherForm.reset();
             editingTeacherId = null;
-            document.getElementById('addUpdateTeacherBtn').textContent = 'Add Teacher';
-            document.getElementById('teacherFormTitle').textContent = 'Add New Teacher';
+            document.getElementById('addUpdateTeacherBtn').textContent = 'Add Faculty';
+            document.getElementById('teacherFormTitle').textContent = 'Add New Faculty';
             document.getElementById('cancelTeacherEditBtn').classList.add('hidden');
             displayTeachers();
+            displayFaculty(); // Refresh faculty display
             populateCourseFacultySelect(); // Refresh faculty dropdown for courses
         });
 
@@ -1567,8 +2146,8 @@
                 document.getElementById('teacherType').value = teacherToEdit.type;
 
                 editingTeacherId = id;
-                document.getElementById('addUpdateTeacherBtn').textContent = 'Update Teacher';
-                document.getElementById('teacherFormTitle').textContent = 'Edit Teacher';
+                document.getElementById('addUpdateTeacherBtn').textContent = 'Update Faculty';
+                document.getElementById('teacherFormTitle').textContent = 'Edit Faculty';
                 document.getElementById('cancelTeacherEditBtn').classList.remove('hidden');
             }
         }
@@ -1579,8 +2158,8 @@
         document.getElementById('cancelTeacherEditBtn').addEventListener('click', () => {
             addTeacherForm.reset();
             editingTeacherId = null;
-            document.getElementById('addUpdateTeacherBtn').textContent = 'Add Teacher';
-            document.getElementById('teacherFormTitle').textContent = 'Add New Teacher';
+            document.getElementById('addUpdateTeacherBtn').textContent = 'Add Faculty';
+            document.getElementById('teacherFormTitle').textContent = 'Add New Faculty';
             document.getElementById('cancelTeacherEditBtn').classList.add('hidden');
         });
 
@@ -1589,18 +2168,20 @@
          * @param {string} id - The ID of the teacher to delete.
          */
         function deleteTeacher(id) {
-            if (confirm('Are you sure you want to delete this teacher?')) {
+            if (confirm('Are you sure you want to delete this faculty member?')) {
                 teachers = teachers.filter(teacher => teacher.id !== id);
                 saveData('teachers', teachers);
                 displayTeachers();
+                displayFaculty(); // Refresh faculty display
                 populateCourseFacultySelect();
-                showMessageBox('Teacher deleted successfully!');
+                showMessageBox('Faculty deleted successfully!');
             }
         }
 
         // --- Routine Management ---
         const addRoutineForm = document.getElementById('addRoutineForm');
         const routineListDiv = document.getElementById('routineList');
+        const displayRoutineListDiv = document.getElementById('displayRoutineList');
         let editingRoutineId = null;
 
         /**
@@ -1623,11 +2204,12 @@
         function displayRoutine() {
             if (routineEntries.length === 0) {
                 routineListDiv.innerHTML = '<p class="text-gray-500 text-center">No routine entries added yet.</p>';
-                document.getElementById('displayRoutineList').innerHTML = '<p class="text-gray-500 text-center">No routine entries to display.</p>';
+                displayRoutineListDiv.innerHTML = '<p class="text-gray-500 text-center">No routine entries to display.</p>';
                 return;
             }
 
-            let tableHtml = `
+            // For Add/Remove tab
+            let addRemoveTableHtml = `
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
@@ -1643,7 +2225,7 @@
 
             routineEntries.forEach(entry => {
                 const course = courses.find(c => c.id === entry.courseId);
-                tableHtml += `
+                addRemoveTableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${course ? `${course.code} - ${course.name}` : 'Unknown Course'}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${entry.day}</td>
@@ -1656,9 +2238,56 @@
                     </tr>
                 `;
             });
-            tableHtml += `</tbody></table>`;
-            routineListDiv.innerHTML = tableHtml;
-            document.getElementById('displayRoutineList').innerHTML = tableHtml;
+            addRemoveTableHtml += `</tbody></table>`;
+            routineListDiv.innerHTML = addRemoveTableHtml;
+
+            // For Routine section (display only)
+            // Group routine entries by day for better display
+            const routineByDay = daysOfWeek.reduce((acc, day) => {
+                acc[day] = routineEntries.filter(entry => entry.day === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+                return acc;
+            }, {});
+
+            let displayRoutineHtml = `
+                <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Day</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Course</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Time</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Room</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Faculty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            let hasRoutine = false;
+            daysOfWeek.forEach(day => {
+                if (routineByDay[day].length > 0) {
+                    hasRoutine = true;
+                    routineByDay[day].forEach(entry => {
+                        const course = courses.find(c => c.id === entry.courseId);
+                        const faculty = course ? teachers.find(t => t.id === course.facultyId) : null;
+                        displayRoutineHtml += `
+                            <tr>
+                                <td class="py-3 px-4 border-b border-gray-200">${entry.day}</td>
+                                <td class="py-3 px-4 border-b border-gray-200">${course ? `${course.code} - ${course.name}` : 'Unknown Course'}</td>
+                                <td class="py-3 px-4 border-b border-gray-200">${entry.startTime} - ${entry.endTime}</td>
+                                <td class="py-3 px-4 border-b border-gray-200">${entry.room}</td>
+                                <td class="py-3 px-4 border-b border-gray-200">${faculty ? faculty.name : 'N/A'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+
+            if (!hasRoutine) {
+                displayRoutineHtml = '<p class="text-gray-500 text-center">No routine entries to display.</p>';
+            } else {
+                displayRoutineHtml += `</tbody></table>`;
+            }
+            displayRoutineListDiv.innerHTML = displayRoutineHtml;
         }
 
         /**
@@ -1692,6 +2321,7 @@
             document.getElementById('cancelRoutineEditBtn').classList.add('hidden');
             displayRoutine();
             renderDragDropRoutineGrid(); // Refresh drag and drop routine
+            displayFaculty(); // Refresh faculty display to update routines
         });
 
         /**
@@ -1735,6 +2365,7 @@
                 saveData('routineEntries', routineEntries);
                 displayRoutine();
                 renderDragDropRoutineGrid();
+                displayFaculty(); // Refresh faculty display to update routines
                 showMessageBox('Routine entry deleted successfully!');
             }
         }
@@ -1742,6 +2373,7 @@
         // --- Holidays & Events Management ---
         const addHolidayForm = document.getElementById('addHolidayForm');
         const holidaysListDiv = document.getElementById('holidaysList');
+        const displayHolidaysListDiv = document.getElementById('displayHolidaysList');
         let editingHolidayId = null;
 
         /**
@@ -1750,11 +2382,12 @@
         function displayHolidaysEvents() {
             if (holidaysEvents.length === 0) {
                 holidaysListDiv.innerHTML = '<p class="text-gray-500 text-center">No events added yet.</p>';
-                document.getElementById('displayHolidaysList').innerHTML = '<p class="text-gray-500 text-center">No holidays or events to display.</p>';
+                displayHolidaysListDiv.innerHTML = '<p class="text-gray-500 text-center">No holidays or events to display.</p>';
                 return;
             }
 
-            let tableHtml = `
+            // For Add/Remove tab
+            let addRemoveTableHtml = `
                 <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
                     <thead>
                         <tr>
@@ -1769,7 +2402,7 @@
             `;
 
             holidaysEvents.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(event => {
-                tableHtml += `
+                addRemoveTableHtml += `
                     <tr>
                         <td class="py-3 px-4 border-b border-gray-200">${event.date}</td>
                         <td class="py-3 px-4 border-b border-gray-200">${event.type}</td>
@@ -1782,9 +2415,35 @@
                     </tr>
                 `;
             });
-            tableHtml += `</tbody></table>`;
-            holidaysListDiv.innerHTML = tableHtml;
-            document.getElementById('displayHolidaysList').innerHTML = tableHtml;
+            addRemoveTableHtml += `</tbody></table>`;
+            holidaysListDiv.innerHTML = addRemoveTableHtml;
+
+            // For Holidays & Events section (display only)
+            let displayHtmlContent = `
+                <table class="min-w-full bg-white rounded-lg shadow overflow-hidden">
+                    <thead>
+                        <tr>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                            <th class="py-3 px-4 border-b-2 border-gray-200 bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            holidaysEvents.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(event => {
+                displayHtmlContent += `
+                    <tr>
+                        <td class="py-3 px-4 border-b border-gray-200">${event.date}</td>
+                        <td class="py-3 px-4 border-b border-gray-200">${event.type}</td>
+                        <td class="py-3 px-4 border-b border-gray-200">${event.title}</td>
+                        <td class="py-3 px-4 border-b border-gray-200">${event.description || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+            displayHtmlContent += `</tbody></table>`;
+            displayHolidaysListDiv.innerHTML = displayHtmlContent;
+
             updateHomeEvents(); // Update home section with new events
         }
 
@@ -1864,15 +2523,15 @@
 
         // --- Home Section Events Display ---
         /**
-         * Updates the "Today's Events" and "Upcoming Events" lists on the home page.
+         * Updates the "Events and Agendas" and "Upcoming Events" lists on the home page.
          */
         function updateHomeEvents() {
-            const todayEventsList = document.getElementById('todayEventsList');
+            const eventsAgendasList = document.getElementById('eventsAgendasList');
             const upcomingEventsList = document.getElementById('upcomingEventsList');
             const today = new Date();
             today.setHours(0, 0, 0, 0); // Normalize to start of day
 
-            todayEventsList.innerHTML = '';
+            eventsAgendasList.innerHTML = '';
             upcomingEventsList.innerHTML = '';
 
             let hasTodayEvents = false;
@@ -1883,16 +2542,16 @@
                 eventDate.setHours(0, 0, 0, 0);
 
                 if (eventDate.getTime() === today.getTime()) {
-                    todayEventsList.innerHTML += `<p class="text-gray-700"><strong>${event.type}:</strong> ${event.title} (${event.description || 'No description'})</p>`;
+                    eventsAgendasList.innerHTML += `<p class="text-gray-700"><strong>${event.type}:</strong> ${event.title} (${event.description || 'No description'})</p>`;
                     hasTodayEvents = true;
-                } else if (eventDate > today && (eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 7) {
+                } else if (eventDate > today && (eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 15) { // Changed to 15 days
                     upcomingEventsList.innerHTML += `<p class="text-gray-700"><strong>${event.date} - ${event.type}:</strong> ${event.title} (${event.description || 'No description'})</p>`;
                     hasUpcomingEvents = true;
                 }
             });
 
             if (!hasTodayEvents) {
-                todayEventsList.innerHTML = '<p class="text-gray-500">No events scheduled for today.</p>';
+                eventsAgendasList.innerHTML = '<p class="text-gray-500">No events scheduled for today.</p>';
             }
             if (!hasUpcomingEvents) {
                 upcomingEventsList.innerHTML = '<p class="text-gray-500">No upcoming events.</p>';
@@ -2283,6 +2942,7 @@
         const loginSection = document.getElementById('loginSection');
         const mainContent = document.getElementById('mainContent');
         const logoutButton = document.getElementById('logoutButton');
+        const keepLoggedInCheckbox = document.getElementById('keepLoggedIn');
 
         loginForm.addEventListener('submit', (event) => {
             event.preventDefault();
@@ -2294,6 +2954,12 @@
             const correctPassword = '@420IN3ll';
 
             if (username === correctUsername && password === correctPassword) {
+                isLoggedIn = true;
+                if (keepLoggedInCheckbox.checked) {
+                    localStorage.setItem('isLoggedIn', 'true');
+                } else {
+                    localStorage.removeItem('isLoggedIn');
+                }
                 loginSection.classList.add('hidden');
                 mainContent.classList.remove('hidden');
                 loginError.classList.add('hidden');
@@ -2308,6 +2974,8 @@
          * Handles the logout process.
          */
         logoutButton.addEventListener('click', () => {
+            isLoggedIn = false;
+            localStorage.removeItem('isLoggedIn'); // Clear persistent login
             mainContent.classList.add('hidden');
             loginSection.classList.remove('hidden');
             usernameInput.value = ''; // Clear username field
@@ -2315,6 +2983,327 @@
             loginError.classList.add('hidden'); // Hide any previous login errors
             showMessageBox('Logged out successfully.');
         });
+
+        /**
+         * Updates the "Home" navigation button with the current date and time.
+         */
+        function updateDateTimeOnHomeButton() {
+            const now = new Date();
+            const options = { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true };
+            navHomeButton.textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        // Update time every minute
+        setInterval(updateDateTimeOnHomeButton, 60000); // Update every 60 seconds
+
+        // --- Expand/Collapse Logic for Sections ---
+        function toggleExpand(element) {
+            const content = element.nextElementSibling;
+            if (content && content.classList.contains('expandable-content')) {
+                element.classList.toggle('active');
+                content.classList.toggle('active');
+            }
+        }
+
+        // --- Add BA (OBE) Curriculum Courses ---
+        function addBACurriculumCourses() {
+            const curriculumName = "BA (OBE)";
+            const defaultFacultyId = 'unknown-faculty'; // Placeholder
+            const defaultTiming = 'TBD'; // Placeholder
+            const defaultRoom = 'TBD'; // Placeholder
+
+            const gedCourses = [
+                { code: "0231ENG1101", name: "Communicative English", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "0231ENG1102", name: "Reading and Writing", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "0232ENG1103", name: "Bangla Language", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "0222ENG1104", name: "History of the Emergence of Bangladesh", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "0222ENG1105", name: "Social History of South Asia", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "0231ENG1201", name: "Advanced Composition", credit: 3, type: "GED", offeredToSemester: "2nd Semester" },
+                { code: "0611ENG1202", name: "Introduction to Computer Applications I", credit: 3, type: "GED", offeredToSemester: "2nd Semester" },
+                { code: "0314ENG1203", name: "Introduction to Sociology", credit: 3, type: "GED", offeredToSemester: "2nd Semester" },
+                { code: "0314ENG2302", name: "Introduction to Anthropology", credit: 3, type: "GED", offeredToSemester: "3rd Semester" },
+                { code: "0223ENG2303", name: "Introduction to Philosophy", credit: 3, type: "GED", offeredToSemester: "3rd Semester" },
+                { code: "0313ENG3501", name: "Introduction to Psychology", credit: 3, type: "GED", offeredToSemester: "5th Semester" }
+            ];
+
+            const coreCourses = [
+                { code: "0232ENG1204", name: "Introduction to Prose", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0232ENG1205", name: "Introduction to Poetry", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0232ENG2301", name: "Introduction to Linguistics", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0222ENG2304", name: "History of Europe", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0232ENG2305", name: "English Phonetics and Phonology", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0232ENG2401", name: "16th, 17th and Restoration Literature", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0222ENG2402", name: "History of English Language", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0232ENG2403", name: "18th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0232ENG2404", name: "Shakespeare", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0111ENG2405", name: "Research Methodology", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0232ENG3502", name: "Romantic Poetry", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "0232ENG3503", name: "19th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "0232ENG3504", name: "World Classics", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "0232ENG3505", name: "Postcolonial Theory and Literature", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "0232ENG3506", name: "Semantics and Pragmatics", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "0232ENG3601", name: "Introduction to ELT", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG3602", name: "English Morphology and Syntax", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG3603", name: "Stylistics", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG3604", name: "Introduction to Feminist Literature", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG3605", name: "Literary Criticism", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG3606", name: "American Literature I", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "0232ENG4701", name: "World Englishes", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0232ENG4702", name: "Discourse Analysis", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0232ENG4703", name: "Psycholinguistics", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0232ENG4704", name: "Sociolinguistics", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0314ENG4705", name: "Introduction to Critical and Cultural Theories", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0232ENG4706", name: "The Modern Novel", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "0232ENG4801", name: "American Literature II", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "0232ENG4802", name: "Media and Literature", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "0231ENG4803", name: "Second Language Acquisition", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "0232ENG4804", name: "Contemporary Continental Literature", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "0232ENG4805", name: "20th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "0232ENG4806", name: "Advanced Stylistics", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" }
+            ];
+
+            const allNewCourses = [...gedCourses, ...coreCourses];
+
+            allNewCourses.forEach(newCourseData => {
+                // Generate a unique ID that includes curriculum, code, and a sanitized name
+                const courseId = `${curriculumName.replace(/\s/g, '-')}_${newCourseData.code}_${newCourseData.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                const existingCourse = courses.find(c => c.id === courseId);
+
+                if (!existingCourse) {
+                    const newCourse = {
+                        id: courseId,
+                        name: newCourseData.name,
+                        code: newCourseData.code,
+                        credit: newCourseData.credit,
+                        semester: 'N/A', // General semester field, specific semester is in offeredToSemester
+                        facultyId: defaultFacultyId,
+                        type: newCourseData.type,
+                        curriculum: curriculumName,
+                        offeredToSemester: newCourseData.offeredToSemester,
+                        timing: defaultTiming,
+                        room: defaultRoom
+                    };
+                    courses.push(newCourse);
+                }
+            });
+            saveData('courses', courses);
+            console.log(`Added/checked ${allNewCourses.length} courses for ${curriculumName} curriculum.`);
+        }
+
+        // --- Add MA in TESOL (OBE) Curriculum Courses ---
+        function addMATESOLCurriculumCourses() {
+            const curriculumName = "MA in TESOL (OBE)";
+            const defaultFacultyId = 'unknown-faculty'; // Placeholder
+            const defaultTiming = 'TBD'; // Placeholder
+            const defaultRoom = 'TBD'; // Placeholder
+
+            const tesolCourses = [
+                // 1st Semester
+                { code: "0231ENG5101", name: "Introduction to Graduate Studies and Research", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5102", name: "Translation Studies", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0232ENG5101", name: "Foundations in Linguistics", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0232ENG5102", name: "Advanced Sociolinguistics", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+
+                // 2nd Semester
+                { code: "0232ENG5201", name: "Advanced Psycholinguistics", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5304", name: "Shakespeare Studies", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0232ENG5202", name: "TESOL Material Development", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0232ENG5203", name: "Measurement and Evaluation for TESOL", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "0232ENG5204", name: "Teaching English at the Secondary and Tertiary Levels", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+
+                // 3rd Semester
+                { code: "0232ENG5301", name: "Theories of Language Learning and Teaching to Speakers of Other Languages", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0232ENG5302", name: "Methods and Techniques for TESOL", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                // NOTE: The following two courses have duplicate codes with different titles.
+                // To ensure uniqueness, their IDs will incorporate the course title.
+                { code: "0232ENG5203", name: "Dynamics of Language Policy and Planning in Bangladesh", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0232ENG5204", name: "TESOL in Bangladesh", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0232ENG5305", name: "Practicum for Teaching English to Speakers of Other Languages", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+
+                // 4th Semester (including Thesis and its replacements)
+                { code: "0232ENG6101", name: "Thesis/TESOL", credit: 6, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0232ENG5306", name: "Seminar in Teaching English as a Second or Foreign Language", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0231ENG6102", name: "ELT Syllabus Design", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0231ENG6103", name: "Critical Discourse Analysis", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0231ENG5307", name: "Digital Humanities", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "0231ENG5205", name: "Cultural and Media Studies", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+
+                // Foundation Courses (for specific students, assigned to "Foundation Semester")
+                { code: "0232ENG2304", name: "English Phonetics and Phonology (Foundation)", credit: 3, type: "Core Course", offeredToSemester: "Foundation Semester" },
+                { code: "0232ENG3505", name: "Semantics and Pragmatics (Foundation)", credit: 3, type: "Core Course", offeredToSemester: "Foundation Semester" },
+                { code: "0232ENG3506", name: "Introduction to ELT (Foundation)", credit: 3, type: "Core Course", offeredToSemester: "Foundation Semester" },
+                { code: "0232ENG3601", name: "Stylistics (Foundation)", credit: 3, type: "Core Course", offeredToSemester: "Foundation Semester" },
+                { code: "0232ENG3606", name: "Discourse Analysis (Foundation)", credit: 3, type: "Core Course", offeredToSemester: "Foundation Semester" }
+            ];
+
+            tesolCourses.forEach(newCourseData => {
+                // Generate a unique ID that includes curriculum, code, and a sanitized name
+                const courseId = `${curriculumName.replace(/\s/g, '-')}_${newCourseData.code}_${newCourseData.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                const existingCourse = courses.find(c => c.id === courseId);
+
+                if (!existingCourse) {
+                    const newCourse = {
+                        id: courseId,
+                        name: newCourseData.name,
+                        code: newCourseData.code,
+                        credit: newCourseData.credit,
+                        semester: 'N/A', // General semester field, specific semester is in offeredToSemester
+                        facultyId: defaultFacultyId,
+                        type: newCourseData.type,
+                        curriculum: curriculumName,
+                        offeredToSemester: newCourseData.offeredToSemester,
+                        timing: defaultTiming,
+                        room: defaultRoom
+                    };
+                    courses.push(newCourse);
+                }
+            });
+            saveData('courses', courses);
+            console.log(`Added/checked ${tesolCourses.length} courses for ${curriculumName} curriculum.`);
+        }
+
+        // --- Add MA (OBE) Curriculum Courses ---
+        function addMAOBECurriculumCourses() {
+            const curriculumName = "MA (OBE)";
+            const defaultFacultyId = 'unknown-faculty'; // Placeholder
+            const defaultTiming = 'TBD'; // Placeholder
+            const defaultRoom = 'TBD'; // Placeholder
+
+            const maCourses = [
+                { code: "0231ENG5101", name: "Introduction to Graduate Studies and Research", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5102", name: "Translation Studies", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5103", name: "Origin and Development of the English Language", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5104", name: "Modern Classics in English Translation", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5105", name: "Postcolonial Fiction and Poetry", credit: 3, type: "Core Course", offeredToSemester: "1st Semester" },
+                { code: "0231ENG5201", name: "Introduction to Creative Writing", credit: 3, type: "Elective", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5202", name: "Contemporary British Literature: 1950 to the Present", credit: 3, type: "Elective", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5203", name: "Postmodern American Fiction from 1945 to 1999", credit: 3, type: "Elective", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5204", name: "Comparative Literature", credit: 3, type: "Elective", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5205", name: "Cultural and Media Studies", credit: 3, type: "Elective", offeredToSemester: "2nd Semester" },
+                { code: "0231ENG5301", name: "South Asian Literature in English", credit: 3, type: "Elective", offeredToSemester: "3rd Semester" },
+                { code: "0231ENG5302", name: "Latin American Literature in English Translation", credit: 3, type: "Elective", offeredToSemester: "3rd Semester" },
+                { code: "0231ENG5303", name: "Critical Theory", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0231ENG5304", name: "Shakespeare Studies", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "0231ENG5305", name: "Studies in African Literature", credit: 3, type: "Elective", offeredToSemester: "Flexible" },
+                { code: "0231ENG5305", name: "Thesis", credit: 6, type: "Thesis", offeredToSemester: "Final Semester" }, // Duplicate code, different name/credit/type
+                { code: "0231ENG5307", name: "Digital Humanities", credit: 3, type: "Elective", offeredToSemester: "Flexible" },
+                { code: "0231ENG5308", name: "Contemporary American Drama: 1980 to the Present", credit: 3, type: "Elective", offeredToSemester: "Flexible" },
+                { code: "0231ENG5309", name: "Contemporary Literary Theory", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "0231ENG5310", name: "Transcultural Feminism", credit: 3, type: "Elective", offeredToSemester: "Flexible" },
+                { code: "0231ENG5311", name: "Literature and Ecology", credit: 3, type: "Elective", offeredToSemester: "Flexible" },
+                { code: "0231ENG5312", name: "Basic Readings in Postcolonial Literary Criticism", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "0231ENG5314", name: "Studies in World Literature", credit: 3, type: "Elective", offeredToSemester: "Flexible" }
+            ];
+
+            maCourses.forEach(newCourseData => {
+                // Generate a unique ID that includes curriculum, code, and a sanitized name
+                const courseId = `${curriculumName.replace(/\s/g, '-')}_${newCourseData.code}_${newCourseData.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                const existingCourse = courses.find(c => c.id === courseId);
+
+                if (!existingCourse) {
+                    const newCourse = {
+                        id: courseId,
+                        name: newCourseData.name,
+                        code: newCourseData.code,
+                        credit: newCourseData.credit,
+                        semester: 'N/A', // General semester field, specific semester is in offeredToSemester
+                        facultyId: defaultFacultyId,
+                        type: newCourseData.type,
+                        curriculum: curriculumName,
+                        offeredToSemester: newCourseData.offeredToSemester,
+                        timing: defaultTiming,
+                        room: defaultRoom
+                    };
+                    courses.push(newCourse);
+                }
+            });
+            saveData('courses', courses);
+            console.log(`Added/checked ${maCourses.length} courses for ${curriculumName} curriculum.`);
+        }
+
+        // --- Add BA (Non-OBE) Curriculum Courses ---
+        function addBANonOBECurriculumCourses() {
+            const curriculumName = "BA (Non-OBE)";
+            const defaultFacultyId = 'unknown-faculty'; // Placeholder
+            const defaultTiming = 'TBD'; // Placeholder
+            const defaultRoom = 'TBD'; // Placeholder
+
+            const baNonObeCourses = [
+                { code: "GED 101", name: "Bangladesh Studies", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "GED 111/CSE 101", name: "Introduction to Computer Applications 1", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "GED 112/CSE 102", name: "Introduction to Computer Applications 2", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "GED 113/ENG 101", name: "Communicative English", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "GED 114/ENG 102", name: "Writing Skills", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "GED 115/ENG 103", name: "Advanced Composition", credit: 3, type: "GED", offeredToSemester: "2nd Semester" },
+                { code: "GED 116/SGS 101", name: "Introduction to Sociology", credit: 3, type: "GED", offeredToSemester: "2nd Semester" },
+                { code: "BAN 101", name: "Bangla Language", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "SGS 106", name: "History of the Emergence of Bangladesh", credit: 3, type: "GED", offeredToSemester: "1st Semester" },
+                { code: "BUS 131", name: "Introduction to Psychology", credit: 3, type: "GED", offeredToSemester: "3rd Semester" },
+                { code: "CHN 102", name: "Introduction to Chinese Language and Culture", credit: 3, type: "Optional General Education", offeredToSemester: "Flexible" },
+                { code: "ENG 104", name: "Introduction to Literature", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "ENG 105", name: "Introduction to Linguistics", credit: 3, type: "Core Course", offeredToSemester: "2nd Semester" },
+                { code: "ENG 201", name: "English Phonetics and Phonology", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "ENG 202", name: "16th and 17th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "ENG 203", name: "Studies in European History", credit: 3, type: "Core Course", offeredToSemester: "3rd Semester" },
+                { code: "ENG 205", name: "Restoration and 18th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "ENG 206", name: "Modern Western Philosophical Thoughts", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "ENG 207", name: "The Romantic Period", credit: 3, type: "Core Course", offeredToSemester: "4th Semester" },
+                { code: "ENG 208", name: "19th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "ENG 209", name: "English Morphology and Syntax", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "ENG 210", name: "Research Methodology", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "ENG 211", name: "History of English Language", credit: 3, type: "Core Course", offeredToSemester: "5th Semester" },
+                { code: "ENG 301", name: "Semantics and Pragmatics", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "ENG 302", name: "Post Colonial Theory and Literature", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "ENG 303", name: "Shakespeare", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "ENG 304", name: "Literary Criticism", credit: 3, type: "Core Course", offeredToSemester: "6th Semester" },
+                { code: "ENG 306", name: "Discourse Analysis", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "ENG 308", name: "Introduction to ELT", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "ENG 309", name: "Old and Middle English", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "ENG 311", name: "Sociolinguistics", credit: 3, type: "Core Course", offeredToSemester: "7th Semester" },
+                { code: "ENG 312", name: "Stylistics", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "ENG 402", name: "Feminist Readings of Literature", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "ENG 403", name: "American Literature 1", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "ENG 404", name: "The Modern Novel", credit: 3, type: "Core Course", offeredToSemester: "8th Semester" },
+                { code: "ENG 405", name: "Cultural Studies", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 406", name: "World Classics in Translation", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 407", name: "American Literature 2", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 408", name: "Contemporary Continental Literature", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 409", name: "Media and Literature", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 410", name: "20th Century Literature", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 415", name: "Second Language Acquisition", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 416", name: "Psycholinguistics", credit: 3, type: "Core Course", offeredToSemester: "Flexible" },
+                { code: "ENG 424", name: "Dissertation/Advanced Stylistics", credit: 3, type: "Core Course", offeredToSemester: "Final Semester" }
+            ];
+
+            baNonObeCourses.forEach(newCourseData => {
+                // Generate a unique ID that includes curriculum, code, and a sanitized name
+                const courseId = `${curriculumName.replace(/\s/g, '-')}_${newCourseData.code}_${newCourseData.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+                const existingCourse = courses.find(c => c.id === courseId);
+
+                if (!existingCourse) {
+                    const newCourse = {
+                        id: courseId,
+                        name: newCourseData.name,
+                        code: newCourseData.code,
+                        credit: newCourseData.credit,
+                        semester: 'N/A', // General semester field, specific semester is in offeredToSemester
+                        facultyId: defaultFacultyId,
+                        type: newCourseData.type,
+                        curriculum: curriculumName,
+                        offeredToSemester: newCourseData.offeredToSemester,
+                        timing: defaultTiming,
+                        room: defaultRoom
+                    };
+                    courses.push(newCourse);
+                }
+            });
+            saveData('courses', courses);
+            console.log(`Added/checked ${baNonObeCourses.length} courses for ${curriculumName} curriculum.`);
+        }
 
 
         // --- Initial App Load ---
@@ -2332,6 +3321,16 @@
             holidaysEvents = JSON.parse(localStorage.getItem('holidaysEvents')) || [];
             attendanceRecords = JSON.parse(localStorage.getItem('attendanceRecords')) || {};
 
+            // Add BA (OBE) curriculum courses if not already present
+            addBACurriculumCourses();
+            // Add MA in TESOL (OBE) curriculum courses if not already present
+            addMATESOLCurriculumCourses();
+            // Add MA (OBE) curriculum courses if not already present
+            addMAOBECurriculumCourses();
+            // Add BA (Non-OBE) curriculum courses if not already present
+            addBANonOBECurriculumCourses();
+
+
             // Set initial active section to Home
             showSection('homeSection', document.getElementById('navHomeButton'));
 
@@ -2344,13 +3343,16 @@
             renderDragDropRoutineGrid(); // Render the routine grid on load
 
             // Display initial lists
-            displayCourses();
+            displayCourses(); // For add/remove tab
+            displayCurricula(); // For curricula section
             displayCourseOfferings();
             displayStudents();
-            displayTeachers();
+            displayTeachers(); // For add/remove tab
+            displayFaculty(); // For faculty section
             displayRoutine();
             displayHolidaysEvents();
             updateHomeEvents();
+            updateDateTimeOnHomeButton(); // Set initial date and time on home button
 
             hideLoading();
         }
@@ -2358,10 +3360,16 @@
         // Event listener for the message box close button
         document.getElementById('messageBoxClose').addEventListener('click', hideMessageBox);
 
-        // Initially hide the main content until login
+        // Check login state on page load
         document.addEventListener('DOMContentLoaded', () => {
-            loginSection.classList.remove('hidden');
-            mainContent.classList.add('hidden');
+            if (isLoggedIn) {
+                loginSection.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                initializeApp();
+            } else {
+                loginSection.classList.remove('hidden');
+                mainContent.classList.add('hidden');
+            }
         });
 
     </script>
